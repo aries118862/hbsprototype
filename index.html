@@ -642,7 +642,7 @@
     </div>
 
     <script>
-        // Mock data for the prototype
+        // Enhanced mock data for the prototype
         const mockData = {
             doctors: [
                 {
@@ -670,7 +670,62 @@
                         { date: "Tomorrow, 29 Oct", time: "10:45 AM", booked: false },
                         { date: "Tomorrow, 29 Oct", time: "03:30 PM", booked: true }
                     ]
+                },
+                {
+                    id: 3,
+                    name: "Dr. John Molefe",
+                    specialty: "Cardiology",
+                    location: "QMMH Main Hospital",
+                    rating: 4.6,
+                    ratingsCount: 89,
+                    availableSlots: [
+                        { date: "Today, 28 Oct", time: "10:00 AM", booked: false },
+                        { date: "Today, 28 Oct", time: "01:30 PM", booked: false },
+                        { date: "Tomorrow, 29 Oct", time: "09:15 AM", booked: false }
+                    ]
+                },
+                {
+                    id: 4,
+                    name: "Dr. Sarah Nkosi",
+                    specialty: "Maternal & Child Health",
+                    location: "QMMH Women's Clinic",
+                    rating: 4.9,
+                    ratingsCount: 67,
+                    availableSlots: [
+                        { date: "Today, 28 Oct", time: "11:30 AM", booked: false },
+                        { date: "Tomorrow, 29 Oct", time: "02:00 PM", booked: false },
+                        { date: "Tomorrow, 29 Oct", time: "04:15 PM", booked: false }
+                    ]
                 }
+            ],
+            conflicts: [
+                { id: 1, type: "Double Booking", doctor: "Dr. Thato Mofokeng", time: "10:00 AM", patients: ["John Patient", "Mary Smith"] },
+                { id: 2, type: "Resource Conflict", resource: "Ultrasound Room", time: "2:30 PM", appointments: ["Cardiology Consult", "Pregnancy Check"] }
+            ],
+            clusters: [
+                { region: "Maseru Urban", appointments: 24, vhwStatus: "Active", action: "Route Optimized" },
+                { region: "Mokhotlong District", appointments: 18, vhwStatus: "En Route", action: "Dispatch Confirmed" },
+                { region: "Butha-Buthe", appointments: 12, vhwStatus: "Pending", action: "Assign VHW" }
+            ],
+            vhwStatus: [
+                { name: "Mpho Letsie", region: "Maseru Urban", lastSync: "2 hours ago", status: "Synced" },
+                { name: "Thabo Molapo", region: "Mokhotlong District", lastSync: "5 hours ago", status: "Pending Sync" },
+                { name: "Lerato Mokoena", region: "Butha-Buthe", lastSync: "1 day ago", status: "Needs Attention" }
+            ],
+            escalations: [
+                { patientId: "P10023", reason: "Missed ART Refill", assignedVHW: "Mpho Letsie", daysOverdue: 14 },
+                { patientId: "P10045", reason: "No-show for Follow-up", assignedVHW: "Thabo Molapo", daysOverdue: 7 },
+                { patientId: "P10067", reason: "Unresponsive to SMS", assignedVHW: "Not Assigned", daysOverdue: 21 }
+            ],
+            dhis2Submissions: [
+                { reportName: "ART Patient Monthly Summary", period: "Oct 2025", status: "Submitted", errors: 0 },
+                { reportName: "Maternal Health Indicators", period: "Oct 2025", status: "Validated", errors: 2 },
+                { reportName: "Facility Utilization", period: "Sep 2025", status: "Submitted", errors: 0 }
+            ],
+            providerTemplates: [
+                { id: 1, name: "Dr. Thato - ART Clinic", hours: "8:00 AM - 4:00 PM", slots: "30 min" },
+                { id: 2, name: "Dr. Lerato - Mobile Clinic", hours: "9:00 AM - 3:00 PM", slots: "45 min" },
+                { id: 3, name: "Cardiology - Standard", hours: "8:30 AM - 5:00 PM", slots: "60 min" }
             ]
         };
 
@@ -681,6 +736,44 @@
         let selectedDoctor = null;
         let selectedSlot = null;
         let appointmentToReschedule = null;
+        let currentWeekOffset = 0; // For calendar navigation
+
+        // Initialize with some sample appointments if none exist
+        if (appointments.length === 0) {
+            appointments = [
+                {
+                    id: "1",
+                    patientId: "patient001",
+                    patientName: "John Patient",
+                    doctor: "Dr. Thato Mofokeng",
+                    doctorId: 1,
+                    specialty: "Infectious Disease (ART)",
+                    type: "Consultation",
+                    status: "confirmed",
+                    date: "Today, 28 Oct",
+                    time: "11:00 AM",
+                    location: "QMMH Clinic 3",
+                    notes: "Regular ART follow-up",
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    id: "2",
+                    patientId: "patient001",
+                    patientName: "John Patient",
+                    doctor: "Dr. John Molefe",
+                    doctorId: 3,
+                    specialty: "Cardiology",
+                    type: "Consultation",
+                    status: "pending",
+                    date: "Tomorrow, 29 Oct",
+                    time: "10:00 AM",
+                    location: "QMMH Main Hospital",
+                    notes: "Cardiac assessment",
+                    createdAt: new Date().toISOString()
+                }
+            ];
+            localStorage.setItem('appointments', JSON.stringify(appointments));
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             const loginScreen = document.getElementById('login-screen');
@@ -694,6 +787,10 @@
             const searchBtn = document.getElementById('search-btn');
             const helpButton = document.getElementById('help-button');
             const helpPanel = document.getElementById('help-panel');
+            const newTemplateBtn = document.getElementById('new-template-btn');
+            const prevWeekBtn = document.getElementById('prev-week');
+            const nextWeekBtn = document.getElementById('next-week');
+            const sendSMSBtn = document.getElementById('send-sms-btn');
 
             // Login functionality
             loginForm.addEventListener('submit', (e) => {
@@ -776,6 +873,35 @@
             });
 
             document.getElementById('confirm-reschedule').addEventListener('click', confirmReschedule);
+
+            // Calendar navigation
+            if (prevWeekBtn) {
+                prevWeekBtn.addEventListener('click', () => {
+                    currentWeekOffset--;
+                    renderCalendar();
+                });
+            }
+
+            if (nextWeekBtn) {
+                nextWeekBtn.addEventListener('click', () => {
+                    currentWeekOffset++;
+                    renderCalendar();
+                });
+            }
+
+            // New template button
+            if (newTemplateBtn) {
+                newTemplateBtn.addEventListener('click', () => {
+                    alert('In a real application, this would open a form to create a new provider template.');
+                });
+            }
+
+            // Send SMS button
+            if (sendSMSBtn) {
+                sendSMSBtn.addEventListener('click', () => {
+                    alert('Bulk SMS sent to all VHWs with updated patient lists and follow-up tasks.');
+                });
+            }
 
             /**
              * Switches the active navigation and content views for the entire portal.
@@ -922,6 +1048,15 @@
                     case 'dashboard':
                         loadDashboard();
                         break;
+                    case 'scheduling':
+                        loadScheduling();
+                        break;
+                    case 'vhw-management':
+                        loadVHWManagement();
+                        break;
+                    case 'dhis2-reporting':
+                        loadDHIS2Reporting();
+                        break;
                 }
             }
 
@@ -929,9 +1064,33 @@
                 const resultsContainer = document.getElementById('search-results');
                 if (!resultsContainer) return;
                 
+                const specialty = document.getElementById('specialty-select').value;
+                const doctorName = document.getElementById('doctor-name').value.toLowerCase();
+                
                 resultsContainer.innerHTML = '';
                 
-                mockData.doctors.forEach(doctor => {
+                let filteredDoctors = mockData.doctors;
+                
+                // Filter by specialty if selected
+                if (specialty) {
+                    filteredDoctors = filteredDoctors.filter(doctor => 
+                        doctor.specialty === specialty
+                    );
+                }
+                
+                // Filter by doctor name if entered
+                if (doctorName) {
+                    filteredDoctors = filteredDoctors.filter(doctor => 
+                        doctor.name.toLowerCase().includes(doctorName)
+                    );
+                }
+                
+                if (filteredDoctors.length === 0) {
+                    resultsContainer.innerHTML = '<p class="text-gray-400 text-center py-8">No doctors found matching your criteria. Try a different search.</p>';
+                    return;
+                }
+                
+                filteredDoctors.forEach(doctor => {
                     const doctorCard = document.createElement('div');
                     doctorCard.className = 'kpi-card p-4 flex flex-col md:flex-row justify-between items-start md:items-center';
                     
@@ -1110,6 +1269,12 @@
                     btn.addEventListener('click', (e) => {
                         const appointmentId = e.target.getAttribute('data-id');
                         cancelAppointment(appointmentId);
+                    });
+                });
+
+                document.querySelectorAll('.directions-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        alert('In a real application, this would open Google Maps with directions to the clinic.');
                     });
                 });
             }
@@ -1323,6 +1488,14 @@
                         message: "Thank you for using our booking system. You can now book, reschedule, and manage your appointments easily.",
                         time: "1 day ago",
                         color: "blue"
+                    },
+                    {
+                        id: 3,
+                        type: "lab",
+                        title: "Lab Results Available",
+                        message: "Your recent blood test results are now available for review.",
+                        time: "3 days ago",
+                        color: "purple"
                     }
                 ];
                 
@@ -1343,8 +1516,239 @@
             }
 
             function loadDashboard() {
-                // This would load dashboard data
-                console.log('Loading dashboard data');
+                // Load conflicts
+                const conflictsList = document.getElementById('conflicts-list');
+                if (conflictsList) {
+                    conflictsList.innerHTML = '';
+                    
+                    mockData.conflicts.forEach(conflict => {
+                        const conflictItem = document.createElement('div');
+                        conflictItem.className = 'bg-red-800/30 p-3 rounded-lg';
+                        
+                        let conflictDetails = '';
+                        if (conflict.type === 'Double Booking') {
+                            conflictDetails = `Patients: ${conflict.patients.join(', ')}`;
+                        } else {
+                            conflictDetails = `Appointments: ${conflict.appointments.join(', ')}`;
+                        }
+                        
+                        conflictItem.innerHTML = `
+                            <p class="font-medium text-red-300">${conflict.type}</p>
+                            <p class="text-sm text-gray-300">${conflict.doctor || conflict.resource} at ${conflict.time}</p>
+                            <p class="text-xs text-gray-400">${conflictDetails}</p>
+                            <button class="mt-2 text-xs bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded">Resolve</button>
+                        `;
+                        
+                        conflictsList.appendChild(conflictItem);
+                    });
+                }
+                
+                // Load clusters
+                const clusterTableBody = document.getElementById('cluster-table-body');
+                if (clusterTableBody) {
+                    clusterTableBody.innerHTML = '';
+                    
+                    mockData.clusters.forEach(cluster => {
+                        const row = document.createElement('tr');
+                        row.className = 'border-b border-gray-700';
+                        
+                        let statusColor = 'text-green-400';
+                        if (cluster.vhwStatus === 'Pending') statusColor = 'text-yellow-400';
+                        if (cluster.vhwStatus === 'En Route') statusColor = 'text-blue-400';
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 font-medium text-white">${cluster.region}</td>
+                            <td class="px-6 py-4">${cluster.appointments}</td>
+                            <td class="px-6 py-4 ${statusColor}">${cluster.vhwStatus}</td>
+                            <td class="px-6 py-4">
+                                <button class="text-blue-400 hover:text-blue-300 text-sm">${cluster.action}</button>
+                            </td>
+                        `;
+                        
+                        clusterTableBody.appendChild(row);
+                    });
+                }
+            }
+
+            function loadScheduling() {
+                // Load provider templates
+                const providerTemplates = document.getElementById('provider-templates');
+                if (providerTemplates) {
+                    providerTemplates.innerHTML = '';
+                    
+                    mockData.providerTemplates.forEach(template => {
+                        const templateItem = document.createElement('li');
+                        templateItem.className = 'p-3 bg-[#1f2a37] rounded-lg';
+                        templateItem.innerHTML = `
+                            <p class="font-medium text-white">${template.name}</p>
+                            <p class="text-xs text-gray-400">Hours: ${template.hours}</p>
+                            <p class="text-xs text-gray-400">Slot Duration: ${template.slots}</p>
+                            <div class="mt-2 flex space-x-2">
+                                <button class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded">Edit</button>
+                                <button class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded">Copy</button>
+                            </div>
+                        `;
+                        
+                        providerTemplates.appendChild(templateItem);
+                    });
+                }
+                
+                // Render calendar
+                renderCalendar();
+            }
+
+            function renderCalendar() {
+                const calendarView = document.getElementById('calendar-view');
+                if (!calendarView) return;
+                
+                // Calculate the current week based on offset
+                const today = new Date();
+                const startDate = new Date(today);
+                startDate.setDate(today.getDate() + (currentWeekOffset * 7) - today.getDay());
+                
+                calendarView.innerHTML = '';
+                
+                // Add day headers
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                days.forEach(day => {
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'p-2 text-center font-medium text-gray-400 bg-[#1f2a37]';
+                    dayHeader.textContent = day;
+                    calendarView.appendChild(dayHeader);
+                });
+                
+                // Add calendar days
+                for (let i = 0; i < 7; i++) {
+                    const currentDate = new Date(startDate);
+                    currentDate.setDate(startDate.getDate() + i);
+                    
+                    const dayElement = document.createElement('div');
+                    dayElement.className = 'calendar-day p-2 border border-[#30363d] overflow-y-auto';
+                    
+                    const dateStr = currentDate.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                    
+                    // Check if this is today
+                    const isToday = currentDate.toDateString() === today.toDateString();
+                    
+                    dayElement.innerHTML = `
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium ${isToday ? 'text-blue-400' : 'text-white'}">${dateStr}</span>
+                            ${isToday ? '<span class="text-xs bg-blue-600 text-white px-1 rounded">Today</span>' : ''}
+                        </div>
+                    `;
+                    
+                    // Add some sample appointments for demonstration
+                    if (i % 2 === 0) {
+                        dayElement.innerHTML += `
+                            <div class="text-xs bg-green-800/30 text-green-300 p-1 rounded mb-1">Dr. Thato - 9:30 AM</div>
+                            <div class="text-xs bg-blue-800/30 text-blue-300 p-1 rounded">Dr. John - 2:00 PM</div>
+                        `;
+                    } else if (i % 3 === 0) {
+                        dayElement.innerHTML += `
+                            <div class="text-xs bg-purple-800/30 text-purple-300 p-1 rounded">Mobile Clinic - All Day</div>
+                        `;
+                    }
+                    
+                    calendarView.appendChild(dayElement);
+                }
+            }
+
+            function loadVHWManagement() {
+                // Load VHW status
+                const vhwStatusList = document.getElementById('vhw-status-list');
+                if (vhwStatusList) {
+                    vhwStatusList.innerHTML = '';
+                    
+                    mockData.vhwStatus.forEach(vhw => {
+                        let statusColor = 'text-green-400';
+                        let statusBg = 'bg-green-800/30';
+                        
+                        if (vhw.status === 'Pending Sync') {
+                            statusColor = 'text-yellow-400';
+                            statusBg = 'bg-yellow-800/30';
+                        } else if (vhw.status === 'Needs Attention') {
+                            statusColor = 'text-red-400';
+                            statusBg = 'bg-red-800/30';
+                        }
+                        
+                        const vhwItem = document.createElement('li');
+                        vhwItem.className = `p-3 rounded-lg ${statusBg}`;
+                        vhwItem.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <p class="font-medium text-white">${vhw.name}</p>
+                                <span class="text-xs ${statusColor}">${vhw.status}</span>
+                            </div>
+                            <p class="text-sm text-gray-400">Region: ${vhw.region}</p>
+                            <p class="text-xs text-gray-500">Last Sync: ${vhw.lastSync}</p>
+                            <div class="mt-2 flex space-x-2">
+                                <button class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded">Sync Now</button>
+                                <button class="text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded">Message</button>
+                            </div>
+                        `;
+                        
+                        vhwStatusList.appendChild(vhwItem);
+                    });
+                }
+                
+                // Load escalations
+                const escalationTableBody = document.getElementById('escalation-table-body');
+                if (escalationTableBody) {
+                    escalationTableBody.innerHTML = '';
+                    
+                    mockData.escalations.forEach(escalation => {
+                        const row = document.createElement('tr');
+                        row.className = 'border-b border-gray-700';
+                        
+                        let actionButton = '<button class="text-blue-400 hover:text-blue-300 text-sm">Assign VHW</button>';
+                        if (escalation.assignedVHW !== 'Not Assigned') {
+                            actionButton = '<button class="text-green-400 hover:text-green-300 text-sm">Follow Up</button>';
+                        }
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 font-medium text-white">${escalation.patientId}</td>
+                            <td class="px-6 py-4">
+                                <span class="text-red-400">${escalation.reason}</span>
+                                <br><span class="text-xs text-gray-400">${escalation.daysOverdue} days overdue</span>
+                            </td>
+                            <td class="px-6 py-4 ${escalation.assignedVHW === 'Not Assigned' ? 'text-yellow-400' : 'text-white'}">${escalation.assignedVHW}</td>
+                            <td class="px-6 py-4">${actionButton}</td>
+                        `;
+                        
+                        escalationTableBody.appendChild(row);
+                    });
+                }
+            }
+
+            function loadDHIS2Reporting() {
+                // Load DHIS2 submissions
+                const dhis2SubmissionsBody = document.getElementById('dhis2-submissions-body');
+                if (dhis2SubmissionsBody) {
+                    dhis2SubmissionsBody.innerHTML = '';
+                    
+                    mockData.dhis2Submissions.forEach(submission => {
+                        const row = document.createElement('tr');
+                        row.className = 'border-b border-gray-700';
+                        
+                        let statusColor = 'text-green-400';
+                        if (submission.status === 'Validated') statusColor = 'text-yellow-400';
+                        
+                        let errorsText = submission.errors === 0 ? 
+                            '<span class="text-green-400">None</span>' : 
+                            `<span class="text-red-400">${submission.errors} errors</span>`;
+                        
+                        row.innerHTML = `
+                            <td class="px-6 py-4 font-medium text-white">${submission.reportName}</td>
+                            <td class="px-6 py-4">${submission.period}</td>
+                            <td class="px-6 py-4 ${statusColor}">${submission.status}</td>
+                            <td class="px-6 py-4">${errorsText}</td>
+                        `;
+                        
+                        dhis2SubmissionsBody.appendChild(row);
+                    });
+                }
             }
         });
     </script>
