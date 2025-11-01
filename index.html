@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HABS | Dual-Portal System</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; 
+            color: #c9d1d9;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .sidebar-item:hover:not(.active-item) {
+            background-color: #161b22;
+        }
+        .active-item {
+            background-color: #238636;
+            color: white;
+            font-weight: 600;
+        }
+        .active-item:hover {
+             background-color: #238636;
+        }
+        .kpi-card {
+            background-color: #161b22;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            border: 1px solid #30363d;
+            transition: transform 0.3s;
+        }
+        .kpi-card:hover {
+            transform: translateY(-2px);
+        }
+        .calendar-day {
+            min-height: 80px;
+            background-color: #12171c;
+        }
+        .time-slot {
+            display: inline-block;
+            padding: 4px 8px;
+            margin: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+        }
+        .time-slot:hover {
+            background-color: #238636;
+            color: white;
+        }
+        .time-slot.booked {
+            background-color: #30363d;
+            color: #6b7280;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+        .time-slot.available {
+            background-color: #1f2a37;
+            color: #c9d1d9;
+        }
+        .time-slot.selected {
+            background-color: #238636;
+            color: white;
+        }
+        .login-container {
+            background-color: #161b22;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border: 1px solid #30363d;
+            max-width: 400px;
+            width: 100%;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal {
+            background-color: #161b22;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border: 1px solid #30363d;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .view-content {
+            display: block;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .help-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            background-color: #238636;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        .help-button:hover {
+            transform: scale(1.1);
+            background-color: #2ea043;
+        }
+        .help-panel {
+            position: fixed;
+            bottom: 5rem;
+            right: 2rem;
+            width: 300px;
+            background-color: #161b22;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border: 1px solid #30363d;
+            z-index: 99;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .help-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #30363d;
+        }
+        .help-item:last-child {
+            border-bottom: none;
+        }
+        .status-confirmed {
+            background-color: #1e3a2f;
+            color: #4ade80;
+        }
+        .status-pending {
+            background-color: #3c2a1e;
+            color: #f59e0b;
+        }
+        .status-cancelled {
+            background-color: #3c1e1e;
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- Login Screen (Initially shown) -->
+    <div id="login-screen" class="modal-overlay">
+        <div class="login-container fade-in">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-white mb-2">HABS <span class="text-blue-400">Booking System</span></h1>
+                <p class="text-gray-400">Please log in to continue</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        class="w-full p-3 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-[#238636] focus:border-[#238636] text-white" 
+                        placeholder="Enter your username"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        class="w-full p-3 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-[#238636] focus:border-[#238636] text-white" 
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="remember" class="h-4 w-4 rounded border-gray-600 bg-[#0d1117] text-blue-600 focus:ring-blue-500">
+                        <label for="remember" class="ml-2 block text-sm text-gray-300">Remember me</label>
+                    </div>
+                    <a href="#" class="text-sm text-blue-400 hover:text-blue-300">Forgot password?</a>
+                </div>
+                
+                <button type="submit" class="w-full bg-blue-600 py-3 rounded-lg text-white font-medium hover:bg-blue-700 transition-colors">
+                    Sign In
+                </button>
+                
+                <div class="text-center mt-4">
+                    <p class="text-sm text-gray-400">
+                        Demo credentials: <br>
+                        <span class="text-blue-400">Patient: patient / password123</span> <br>
+                        <span class="text-green-400">Admin: admin / password123</span>
+                    </p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App (Initially hidden) -->
+    <div id="app" class="hidden w-full h-full flex">
+        <!-- Sidebar: Navigation & Portal Switch -->
+        <aside class="w-64 bg-[#0d1117] border-r border-[#30363d] flex flex-col p-4 shadow-xl">
+            <div class="text-xl font-bold text-white mb-6 p-3">
+                HABS <span class="text-blue-400">Booking System</span>
+            </div>
+
+            <!-- User Info -->
+            <div class="p-3 mb-4 bg-[#161b22] rounded-lg border border-[#30363d]">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
+                        <span id="user-initial">U</span>
+                    </div>
+                    <div class="ml-3">
+                        <p id="user-name" class="text-sm font-medium text-white">User Name</p>
+                        <p id="user-role" class="text-xs text-gray-400">Role</p>
+                    </div>
+                </div>
+                <button id="logout-btn" class="mt-3 w-full text-xs text-red-400 hover:text-red-300 py-1 rounded border border-red-800/50 hover:bg-red-900/20 transition-colors">
+                    Log Out
+                </button>
+            </div>
+
+            <!-- Portal Switcher -->
+            <div class="p-3 mb-6 bg-[#161b22] rounded-lg border border-[#30363d]">
+                <p class="text-xs text-gray-500 mb-2">Current Portal</p>
+                <button id="portal-switch-patient" class="w-full py-2 mb-2 rounded-lg font-semibold text-white transition-colors bg-blue-600 hover:bg-blue-700">
+                    <span class="portal-name">Patient Portal</span>
+                </button>
+                <button id="portal-switch-admin" class="w-full py-2 rounded-lg font-semibold text-gray-400 border border-gray-600 hover:bg-gray-800">
+                    <span class="portal-name">Admin Portal</span>
+                </button>
+            </div>
+
+            <!-- Sidebar Navigation (Initial state is Patient) -->
+            <nav id="patient-nav" class="flex-grow space-y-2">
+                <div class="sidebar-item active-item" data-view="patient-search">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><path d="M11 8v6h4"></path></svg>
+                    Book Appointment
+                </div>
+                <div class="sidebar-item" data-view="patient-appointments">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    My Appointments
+                </div>
+                <div class="sidebar-item" data-view="patient-notifications">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M10 5a2 2 0 0 1 4 0v6a2 2 0 0 1-4 0v-6z"></path><path d="M12 20a4 4 0 0 0 4-4H8a4 4 0 0 0 4 4z"></path><path d="M18 8a6 6 0 0 0-12 0v5"></path></svg>
+                    Notifications & Reminders
+                </div>
+            </nav>
+
+            <nav id="admin-nav" class="flex-grow space-y-2 hidden">
+                <div class="sidebar-item active-item" data-view="dashboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    Dashboard
+                </div>
+                <div class="sidebar-item" data-view="scheduling">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M9 16l2 2 4-4"></path></svg>
+                    Scheduling & Templates
+                </div>
+                <div class="sidebar-item" data-view="vhw-management">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    VHW Management
+                </div>
+                <div class="sidebar-item" data-view="dhis2-reporting">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>
+                    DHIS2 Reporting Data
+                </div>
+                <div class="sidebar-item" data-view="admin-appointments">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-3"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M8 14h.01"></path><path d="M12 14h.01"></path><path d="M16 14h.01"></path><path d="M8 18h.01"></path><path d="M12 18h.01"></path><path d="M16 18h.01"></path></svg>
+                    Patient Appointments
+                </div>
+            </nav>
+
+            <div class="mt-8 text-sm text-gray-500 p-3">
+                v1.0.0
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-8">
+            <!-- Content Container -->
+            <div id="content-container">
+                
+                <!-- ======= PATIENT PORTAL VIEWS ======= -->
+
+                <!-- 1. PATIENT: Book Appointment (Search & Filtering) -->
+                <div id="patient-search" class="view-content">
+                    <header class="mb-8">
+                        <h1 class="text-3xl font-bold text-white">Book Appointment: Find a Specialist</h1>
+                        <p class="text-gray-400 mt-1">Easily search for doctors by specialty or name and view real-time availability. (HCI: Efficiency and User Control)</p>
+                    </header>
+
+                    <div class="bg-[#161b22] p-6 rounded-xl border border-[#30363d] mb-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <select id="specialty-select" class="p-3 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-[#238636] focus:border-[#238636] text-white" aria-label="Select Specialty">
+                                <option value="" selected>Select Specialty...</option>
+                                <option>Cardiology</option>
+                                <option>Infectious Disease (ART)</option>
+                                <option>Maternal & Child Health</option>
+                                <option>Orthopedics</option>
+                            </select>
+                            <input id="doctor-name" type="text" placeholder="Doctor's Name (Optional)" class="p-3 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-[#238636] focus:border-[#238636] text-white"/>
+                            <button id="search-btn" class="bg-blue-600 py-3 rounded-lg text-white font-medium hover:bg-blue-700 transition-colors">Search Availability</button>
+                        </div>
+                    </div>
+
+                    <!-- Doctor Search Results -->
+                    <h2 class="text-2xl font-semibold mb-4 text-white">Available Doctors</h2>
+                    <div id="search-results" class="space-y-4">
+                        <!-- Results will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- 2. PATIENT: My Appointments (Management) -->
+                <div id="patient-appointments" class="view-content hidden">
+                    <header class="mb-8">
+                        <h1 class="text-3xl font-bold text-white">My Appointments</h1>
+                        <p class="text-gray-400 mt-1">View, reschedule, or cancel your upcoming visits. (HCI: User Control and Freedom)</p>
+                    </header>
+
+                    <div id="appointments-list" class="space-y-6">
+                        <!-- Appointments will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- 3. PATIENT: Notifications & Reminders -->
+                <div id="patient-notifications" class="view-content hidden">
+                    <header class="mb-8">
+                        <h1 class="text-3xl font-bold text-white">Notifications & Reminders</h1>
+                        <p class="text-gray-400 mt-1">Receive proactive alerts about your appointments, lab results, and medication. (HCI: Feedback and Visibility)</p>
+                    </header>
+
+                    <div id="notifications-list" class="space-y-4">
+                        <!-- Notifications will be populated by JavaScript -->
+                    </div>
+                </div>
+
+
+                <!-- ======= STAFF/ADMIN PORTAL VIEWS ======= -->
+                
+                <div id="staff-portal" class="view-content hidden">
+
+                    <!-- 4. ADMIN: Dashboard (Default/Active View) -->
+                    <div id="dashboard" class="sub-view-content">
+                        <header class="mb-8">
+                            <h1 class="text-3xl font-bold text-white">Operational Overview: Queen Mamohato Memorial Hospital</h1>
+                            <p class="text-gray-400 mt-1">Data synchronized in real-time with eRegister EMR. Last update: <span id="last-update">16:35 SAST</span></p>
+                        </header>
+        
+                        <!-- KPI Cards (HCI: Visibility of System Status) -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                            <div class="kpi-card">
+                                <p class="text-sm text-gray-400">Today's Utilization Rate</p>
+                                <p class="text-4xl font-extrabold text-[#38a169] mt-1">85%</p>
+                                <p class="text-xs text-gray-500 mt-2">Target: 90%. Avoids staff burnout (Section 2.2)</p>
+                            </div>
+                            <div class="kpi-card">
+                                <p class="text-sm text-gray-400">LTFU Rate (30 Days) - ART Patients</p>
+                                <p class="text-4xl font-extrabold text-red-500 mt-1">5.2%</p>
+                                <p class="text-xs text-gray-500 mt-2">National target: <4%. Requires VHW follow-up.</p>
+                            </div>
+                            <div class="kpi-card">
+                                <p class="text-sm text-gray-400">Confirmed Appointments (Tomorrow)</p>
+                                <p class="text-4xl font-extrabold text-blue-400 mt-1">112 / 125</p>
+                                <p class="text-xs text-gray-500 mt-2">Confirmed via automated SMS (Section 4.3).</p>
+                            </div>
+                            <div class="kpi-card">
+                                <p class="text-sm text-gray-400">Open Scheduling Conflicts</p>
+                                <p class="text-4xl font-extrabold text-yellow-400 mt-1">3</p>
+                                <p class="text-xs text-gray-500 mt-2">Requires manual intervention (HCI: Error Prevention).</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Main Work Area: Conflict and Cluster Management -->
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="lg:col-span-1 kpi-card p-6 bg-red-900/20 border-red-700/50">
+                                <h2 class="text-xl font-semibold mb-4 text-red-400">Priority Conflict Resolution</h2>
+                                <p class="text-sm text-gray-400 mb-4">Immediate attention needed to prevent patient delay and wasted travel time.</p>
+                                <div id="conflicts-list" class="space-y-3">
+                                    <!-- Conflicts will be populated by JavaScript -->
+                                </div>
+                            </div>
+                            <div class="lg:col-span-2 kpi-card p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-white">Dynamic Cluster Scheduling: Today</h2>
+                                <p class="text-sm text-gray-400 mb-4">View appointments grouped by patient geographical region to optimize mobile clinic routing and VHW travel (Section 4.3).</p>
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs uppercase text-gray-400 bg-[#30363d]/30">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 rounded-tl-lg">Cluster Region</th>
+                                            <th scope="col" class="px-6 py-3">Total Appointments</th>
+                                            <th scope="col" class="px-6 py-3">VHW Status</th>
+                                            <th scope="col" class="px-6 py-3 rounded-tr-lg">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cluster-table-body">
+                                        <!-- Clusters will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. ADMIN: Scheduling & Templates VIEW -->
+                    <div id="scheduling" class="sub-view-content hidden">
+                        <header class="mb-8">
+                            <h1 class="text-3xl font-bold text-white">Scheduling and Resource Template Management</h1>
+                            <p class="text-gray-400 mt-1">Define provider availability and clinical resource capacity to prevent conflicts.</p>
+                        </header>
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            <div class="kpi-card lg:col-span-1 p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-white">Provider Templates</h2>
+                                <ul id="provider-templates" class="space-y-3 text-sm">
+                                    <!-- Templates will be populated by JavaScript -->
+                                </ul>
+                                <button id="new-template-btn" class="mt-4 w-full bg-[#238636] py-2 rounded-lg text-white font-medium hover:bg-[#38a169]">+ New Template</button>
+                            </div>
+                            <div class="lg:col-span-3 kpi-card p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl font-semibold text-white">Weekly View: October 2025</h2>
+                                    <div class="space-x-2">
+                                        <button id="prev-week" class="p-2 rounded-full bg-gray-700/50 hover:bg-gray-600/50 text-white">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                                        </button>
+                                        <button id="next-week" class="p-2 rounded-full bg-gray-700/50 hover:bg-gray-600/50 text-white">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="calendar-view" class="grid grid-cols-7 text-xs h-[400px] border border-[#30363d] rounded-lg overflow-hidden">
+                                    <!-- Calendar will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 6. ADMIN: VHW MANAGEMENT VIEW -->
+                    <div id="vhw-management" class="sub-view-content hidden">
+                        <header class="mb-8">
+                            <h1 class="text-3xl font-bold text-white">Village Health Worker (VHW) Support & Escalations</h1>
+                            <p class="text-gray-400 mt-1">Track VHW offline data synchronization status and delegate patient follow-up tasks.</p>
+                        </header>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="kpi-card lg:col-span-1 p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-white">Active VHW Sync Status</h2>
+                                <ul id="vhw-status-list" class="space-y-4">
+                                    <!-- VHW status will be populated by JavaScript -->
+                                </ul>
+                                <button id="send-sms-btn" class="mt-6 w-full bg-blue-600 py-2 rounded-lg text-white font-medium hover:bg-blue-700">Send Bulk Codified SMS to All VHWs</button>
+                            </div>
+                            <div class="kpi-card lg:col-span-2 p-6">
+                                <h2 class="text-xl font-semibold mb-4 text-white">Patient Escalation & Follow-Up (Loss to Follow-Up)</h2>
+                                <table class="w-full text-sm text-left">
+                                    <thead class="text-xs uppercase text-gray-400 bg-[#30363d]/30">
+                                        <tr><th scope="col" class="px-6 py-3">Patient ID</th><th scope="col" class="px-6 py-3">Reason for Escalation</th><th scope="col" class="px-6 py-3">Assigned VHW</th><th scope="col" class="px-6 py-3">Action</th></tr>
+                                    </thead>
+                                    <tbody id="escalation-table-body">
+                                        <!-- Escalations will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 7. ADMIN: DHIS2 REPORTING DATA VIEW -->
+                    <div id="dhis2-reporting" class="sub-view-content hidden">
+                        <header class="mb-8">
+                            <h1 class="text-3xl font-bold text-white">National Public Health Reporting (DHIS2 Feed)</h1>
+                            <p class="text-gray-400 mt-1">Aggregate HABS-L data to DHIS2 for national monitoring and policy decisions.</p>
+                        </header>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="kpi-card p-6"><p class="text-sm text-gray-400">ART Adherence Rate (90 Days)</p><p class="text-4xl font-extrabold text-[#38a169] mt-1">92.1%</p><p class="text-xs text-gray-500 mt-2">Target: 95%. Directly influenced by HABS-L reminders.</p></div>
+                            <div class="kpi-card p-6"><p class="text-sm text-gray-400">Average No-Show Rate</p><p class="text-4xl font-extrabold text-blue-400 mt-1">11.8%</p><p class="text-xs text-gray-500 mt-2">Reduction of 2.1% since pilot launch.</p></div>
+                            <div class="kpi-card p-6"><p class="text-sm text-gray-400">Referrals Managed (Last Month)</p><p class="text-4xl font-extrabold text-yellow-400 mt-1">456</p><p class="text-xs text-gray-500 mt-2">Facility-to-facility tracking via HABS-L.</p></div>
+                        </div>
+                        <div class="kpi-card p-6">
+                            <h2 class="text-xl font-semibold mb-4 text-white">Recent DHIS2 Submissions</h2>
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs uppercase text-gray-400 bg-[#30363d]/30">
+                                    <tr><th scope="col" class="px-6 py-3">Report Name</th><th scope="col" class="px-6 py-3">Period</th><th scope="col" class="px-6 py-3">Status</th><th scope="col" class="px-6 py-3">Validation Errors</th></tr>
+                                </thead>
+                                <tbody id="dhis2-submissions-body">
+                                    <!-- Submissions will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                            <p class="text-xs text-gray-500 mt-4">*Interoperability is mandated to ensure automated data flow into this national HMIS (Section 3.3).</p>
+                        </div>
+                    </div>
+
+                    <!-- 8. ADMIN: Patient Appointments VIEW -->
+                    <div id="admin-appointments" class="sub-view-content hidden">
+                        <header class="mb-8">
+                            <h1 class="text-3xl font-bold text-white">Patient Appointments Overview</h1>
+                            <p class="text-gray-400 mt-1">View and manage all patient appointments across the healthcare system.</p>
+                        </header>
+
+                        <div class="mb-6">
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                <div class="kpi-card text-center">
+                                    <p class="text-sm text-gray-400">Total Appointments Today</p>
+                                    <p class="text-3xl font-bold text-white" id="today-appointments">0</p>
+                                </div>
+                                <div class="kpi-card text-center">
+                                    <p class="text-sm text-gray-400">Confirmed</p>
+                                    <p class="text-3xl font-bold text-green-500" id="confirmed-appointments">0</p>
+                                </div>
+                                <div class="kpi-card text-center">
+                                    <p class="text-sm text-gray-400">Pending</p>
+                                    <p class="text-3xl font-bold text-yellow-500" id="pending-appointments">0</p>
+                                </div>
+                                <div class="kpi-card text-center">
+                                    <p class="text-sm text-gray-400">Cancelled</p>
+                                    <p class="text-3xl font-bold text-red-500" id="cancelled-appointments">0</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-[#161b22] p-4 rounded-lg mb-6">
+                                <h3 class="text-lg font-semibold text-white mb-3">Quick Filters</h3>
+                                <div class="flex flex-wrap gap-2">
+                                    <button class="filter-btn px-3 py-1 rounded-lg bg-blue-600 text-white text-sm" data-filter="all">All Appointments</button>
+                                    <button class="filter-btn px-3 py-1 rounded-lg bg-gray-700 text-white text-sm" data-filter="today">Today</button>
+                                    <button class="filter-btn px-3 py-1 rounded-lg bg-gray-700 text-white text-sm" data-filter="confirmed">Confirmed</button>
+                                    <button class="filter-btn px-3 py-1 rounded-lg bg-gray-700 text-white text-sm" data-filter="pending">Pending</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card p-6">
+                            <h2 class="text-xl font-semibold mb-4 text-white">All Patient Appointments</h2>
+                            <div id="admin-appointments-list" class="space-y-4">
+                                <!-- Admin appointments will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Staff Portal Views -->
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Appointment Booking Modal -->
+    <div id="booking-modal" class="modal-overlay hidden">
+        <div class="modal fade-in">
+            <h2 class="text-2xl font-bold text-white mb-4">Book Appointment</h2>
+            <div id="booking-details" class="mb-6">
+                <!-- Booking details will be populated by JavaScript -->
+            </div>
+            <div class="mb-6">
+                <label for="patient-notes" class="block text-sm font-medium text-gray-300 mb-1">Additional Notes (Optional)</label>
+                <textarea id="patient-notes" class="w-full p-3 rounded-lg bg-[#0d1117] border border-gray-600 focus:ring-[#238636] focus:border-[#238636] text-white" rows="3" placeholder="Any additional information for the doctor..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-booking" class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors">Cancel</button>
+                <button id="confirm-booking" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Confirm Booking</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reschedule Modal -->
+    <div id="reschedule-modal" class="modal-overlay hidden">
+        <div class="modal fade-in">
+            <h2 class="text-2xl font-bold text-white mb-4">Reschedule Appointment</h2>
+            <div id="reschedule-details" class="mb-6">
+                <!-- Reschedule details will be populated by JavaScript -->
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Select New Time Slot</label>
+                <div id="reschedule-slots" class="space-y-2">
+                    <!-- Time slots will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-reschedule" class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors">Cancel</button>
+                <button id="confirm-reschedule" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Reschedule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Floating Button -->
+    <div id="help-button" class="help-button hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+    </div>
+
+    <!-- Help Panel -->
+    <div id="help-panel" class="help-panel hidden">
+        <h3 class="text-lg font-semibold text-white mb-3">How to Use HABS</h3>
+        <div class="space-y-2">
+            <div class="help-item">
+                <p class="font-medium text-white">Booking Appointments</p>
+                <p class="text-sm text-gray-400">Search for doctors by specialty, select available time slots, and confirm your booking.</p>
+            </div>
+            <div class="help-item">
+                <p class="font-medium text-white">Managing Appointments</p>
+                <p class="text-sm text-gray-400">View, reschedule, or cancel your appointments from the "My Appointments" section.</p>
+            </div>
+            <div class="help-item">
+                <p class="font-medium text-white">Notifications</p>
+                <p class="text-sm text-gray-400">Receive reminders 48 hours before your appointment and updates about lab results.</p>
+            </div>
+            <div class="help-item">
+                <p class="font-medium text-white">Admin Features</p>
+                <p class="text-sm text-gray-400">Staff can view all appointments, manage schedules, and track VHW activities.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data for the prototype
+        const mockData = {
+            doctors: [
+                {
+                    id: 1,
+                    name: "Dr. Thato Mofokeng",
+                    specialty: "Infectious Disease (ART)",
+                    location: "QMMH Clinic 3",
+                    rating: 4.8,
+                    ratingsCount: 120,
+                    availableSlots: [
+                        { date: "Today, 28 Oct", time: "09:30 AM", booked: false },
+                        { date: "Today, 28 Oct", time: "11:00 AM", booked: false },
+                        { date: "Today, 28 Oct", time: "02:15 PM", booked: false }
+                    ]
+                },
+                {
+                    id: 2,
+                    name: "Dr. Lerato Khatoane",
+                    specialty: "Infectious Disease (ART)",
+                    location: "Satellite Clinic Mokhotlong",
+                    rating: 5.0,
+                    ratingsCount: 45,
+                    availableSlots: [
+                        { date: "Tomorrow, 29 Oct", time: "08:00 AM", booked: true },
+                        { date: "Tomorrow, 29 Oct", time: "10:45 AM", booked: false },
+                        { date: "Tomorrow, 29 Oct", time: "03:30 PM", booked: true }
+                    ]
+                }
+            ]
+        };
+
+        // Global state
+        let currentUser = null;
+        let currentPortal = 'patient';
+        let appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+        let selectedDoctor = null;
+        let selectedSlot = null;
+        let appointmentToReschedule = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginScreen = document.getElementById('login-screen');
+            const app = document.getElementById('app');
+            const loginForm = document.getElementById('login-form');
+            const logoutBtn = document.getElementById('logout-btn');
+            const patientNav = document.getElementById('patient-nav');
+            const adminNav = document.getElementById('admin-nav');
+            const portalSwitchPatient = document.getElementById('portal-switch-patient');
+            const portalSwitchAdmin = document.getElementById('portal-switch-admin');
+            const searchBtn = document.getElementById('search-btn');
+            const helpButton = document.getElementById('help-button');
+            const helpPanel = document.getElementById('help-panel');
+
+            // Login functionality
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                // Simple authentication for prototype
+                if ((username === 'patient' && password === 'password123') || 
+                    (username === 'admin' && password === 'password123')) {
+                    
+                    currentUser = {
+                        username: username,
+                        role: username === 'admin' ? 'Administrator' : 'Patient',
+                        name: username === 'admin' ? 'Admin User' : 'John Patient',
+                        id: username === 'admin' ? 'admin001' : 'patient001'
+                    };
+                    
+                    // Update UI with user info
+                    document.getElementById('user-name').textContent = currentUser.name;
+                    document.getElementById('user-role').textContent = currentUser.role;
+                    document.getElementById('user-initial').textContent = currentUser.name.charAt(0);
+                    
+                    // Hide login, show app
+                    loginScreen.classList.add('hidden');
+                    app.classList.remove('hidden');
+                    helpButton.classList.remove('hidden');
+                    
+                    // Initialize the appropriate portal
+                    if (currentUser.role === 'Administrator') {
+                        switchPortal('admin');
+                    } else {
+                        switchPortal('patient');
+                    }
+                } else {
+                    alert('Invalid credentials. Please use patient/password123 or admin/password123');
+                }
+            });
+
+            // Logout functionality
+            logoutBtn.addEventListener('click', () => {
+                currentUser = null;
+                app.classList.add('hidden');
+                loginScreen.classList.remove('hidden');
+                helpButton.classList.add('hidden');
+                helpPanel.classList.add('hidden');
+                loginForm.reset();
+            });
+
+            // Help button functionality
+            helpButton.addEventListener('click', () => {
+                helpPanel.classList.toggle('hidden');
+            });
+
+            // Close help panel when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!helpPanel.contains(e.target) && !helpButton.contains(e.target)) {
+                    helpPanel.classList.add('hidden');
+                }
+            });
+
+            // Search functionality
+            if (searchBtn) {
+                searchBtn.addEventListener('click', performSearch);
+            }
+
+            // Booking modal functionality
+            document.getElementById('cancel-booking').addEventListener('click', () => {
+                document.getElementById('booking-modal').classList.add('hidden');
+                selectedDoctor = null;
+                selectedSlot = null;
+            });
+
+            document.getElementById('confirm-booking').addEventListener('click', confirmBooking);
+
+            // Reschedule modal functionality
+            document.getElementById('cancel-reschedule').addEventListener('click', () => {
+                document.getElementById('reschedule-modal').classList.add('hidden');
+                appointmentToReschedule = null;
+            });
+
+            document.getElementById('confirm-reschedule').addEventListener('click', confirmReschedule);
+
+            /**
+             * Switches the active navigation and content views for the entire portal.
+             */
+            function switchPortal(portal) {
+                currentPortal = portal;
+                
+                console.log(`Switching to ${portal} portal`);
+                
+                // Update Portal Switcher Button Styles
+                if (portal === 'patient') {
+                    portalSwitchPatient.classList.remove('border-gray-600', 'text-gray-400', 'hover:bg-gray-800');
+                    portalSwitchPatient.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                    
+                    portalSwitchAdmin.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                    portalSwitchAdmin.classList.add('border-gray-600', 'text-gray-400', 'hover:bg-gray-800');
+                    
+                    // Show patient nav, hide admin nav
+                    patientNav.classList.remove('hidden');
+                    adminNav.classList.add('hidden');
+                    
+                    // Show patient content, hide admin content
+                    document.getElementById('staff-portal').classList.add('hidden');
+                    document.getElementById('patient-search').classList.remove('hidden');
+                    
+                    // Set active navigation item
+                    setActiveNavItem('patient-search', patientNav);
+                    
+                } else { // admin
+                    portalSwitchAdmin.classList.remove('border-gray-600', 'text-gray-400', 'hover:bg-gray-800');
+                    portalSwitchAdmin.classList.add('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+
+                    portalSwitchPatient.classList.remove('bg-blue-600', 'text-white', 'hover:bg-blue-700');
+                    portalSwitchPatient.classList.add('border-gray-600', 'text-gray-400', 'hover:bg-gray-800');
+                    
+                    // Show admin nav, hide patient nav
+                    adminNav.classList.remove('hidden');
+                    patientNav.classList.add('hidden');
+                    
+                    // Show admin content, hide patient content
+                    document.getElementById('staff-portal').classList.remove('hidden');
+                    document.getElementById('patient-search').classList.add('hidden');
+                    document.getElementById('patient-appointments').classList.add('hidden');
+                    document.getElementById('patient-notifications').classList.add('hidden');
+                    
+                    // Set active navigation item
+                    setActiveNavItem('dashboard', adminNav);
+                }
+
+                // Load initial data for the portal
+                loadInitialData();
+            }
+
+            function setActiveNavItem(viewId, navElement) {
+                // Remove active class from all items
+                navElement.querySelectorAll('.sidebar-item').forEach(item => {
+                    item.classList.remove('active-item');
+                });
+                
+                // Add active class to the current item
+                const targetItem = navElement.querySelector(`[data-view="${viewId}"]`);
+                if (targetItem) {
+                    targetItem.classList.add('active-item');
+                }
+            }
+
+            // Attach event listeners for internal navigation (Patient)
+            patientNav.querySelectorAll('.sidebar-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const viewId = item.getAttribute('data-view');
+                    switchPatientView(viewId);
+                });
+            });
+
+            // Attach event listeners for internal navigation (Admin)
+            adminNav.querySelectorAll('.sidebar-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const viewId = item.getAttribute('data-view');
+                    switchAdminView(viewId);
+                });
+            });
+
+            function switchPatientView(viewId) {
+                // Hide all patient views
+                document.querySelectorAll('#content-container > .view-content').forEach(view => {
+                    view.classList.add('hidden');
+                });
+                
+                // Show the selected view
+                document.getElementById(viewId).classList.remove('hidden');
+                
+                // Update active nav item
+                setActiveNavItem(viewId, patientNav);
+                
+                // Load data for the view
+                loadViewData(viewId);
+            }
+
+            function switchAdminView(viewId) {
+                // Hide all admin sub-views
+                document.querySelectorAll('#staff-portal > .sub-view-content').forEach(view => {
+                    view.classList.add('hidden');
+                });
+                
+                // Show the selected view
+                document.getElementById(viewId).classList.remove('hidden');
+                
+                // Update active nav item
+                setActiveNavItem(viewId, adminNav);
+                
+                // Load data for the view
+                loadViewData(viewId);
+            }
+
+            // Attach event listeners for portal switching
+            portalSwitchPatient.addEventListener('click', () => switchPortal('patient'));
+            portalSwitchAdmin.addEventListener('click', () => switchPortal('admin'));
+
+            function loadInitialData() {
+                // Update last update time
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString('en-ZA', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'Africa/Johannesburg'
+                }) + ' SAST';
+            }
+
+            function loadViewData(viewId) {
+                console.log(`Loading data for view: ${viewId}`);
+                
+                switch(viewId) {
+                    case 'patient-search':
+                        performSearch();
+                        break;
+                    case 'patient-appointments':
+                        loadPatientAppointments();
+                        break;
+                    case 'patient-notifications':
+                        loadNotifications();
+                        break;
+                    case 'admin-appointments':
+                        loadAdminAppointments();
+                        break;
+                    case 'dashboard':
+                        loadDashboard();
+                        break;
+                }
+            }
+
+            function performSearch() {
+                const resultsContainer = document.getElementById('search-results');
+                if (!resultsContainer) return;
+                
+                resultsContainer.innerHTML = '';
+                
+                mockData.doctors.forEach(doctor => {
+                    const doctorCard = document.createElement('div');
+                    doctorCard.className = 'kpi-card p-4 flex flex-col md:flex-row justify-between items-start md:items-center';
+                    
+                    const doctorInfo = document.createElement('div');
+                    doctorInfo.innerHTML = `
+                        <p class="text-lg font-bold text-[#238636]">${doctor.name}</p>
+                        <p class="text-sm text-gray-400">${doctor.specialty} | ${doctor.location}</p>
+                        <p class="text-xs text-yellow-400 mt-1">${doctor.rating}/5 Stars (${doctor.ratingsCount} Ratings)</p>
+                    `;
+                    
+                    const slotsInfo = document.createElement('div');
+                    slotsInfo.className = 'mt-4 md:mt-0';
+                    
+                    let slotsHTML = '';
+                    doctor.availableSlots.forEach(slot => {
+                        const slotClass = slot.booked ? 
+                            'time-slot booked' : 
+                            'time-slot available';
+                            
+                        slotsHTML += `<span class="${slotClass}" data-doctor-id="${doctor.id}" data-slot-time="${slot.time}" data-slot-date="${slot.date}">${slot.time}</span>`;
+                    });
+                    
+                    slotsInfo.innerHTML = `
+                        <p class="text-sm text-gray-400 mb-2">Available Slots</p>
+                        <div class="flex flex-wrap">${slotsHTML}</div>
+                    `;
+                    
+                    doctorCard.appendChild(doctorInfo);
+                    doctorCard.appendChild(slotsInfo);
+                    resultsContainer.appendChild(doctorCard);
+                });
+
+                // Add event listeners to available time slots
+                document.querySelectorAll('.time-slot.available').forEach(slot => {
+                    slot.addEventListener('click', handleSlotSelection);
+                });
+            }
+
+            function handleSlotSelection(e) {
+                const doctorId = parseInt(e.target.getAttribute('data-doctor-id'));
+                const slotTime = e.target.getAttribute('data-slot-time');
+                const slotDate = e.target.getAttribute('data-slot-date');
+                
+                selectedDoctor = mockData.doctors.find(d => d.id === doctorId);
+                selectedSlot = { time: slotTime, date: slotDate };
+                
+                // Update selected slot UI
+                document.querySelectorAll('.time-slot').forEach(slot => {
+                    slot.classList.remove('selected');
+                });
+                e.target.classList.add('selected');
+                
+                // Show booking modal
+                const bookingDetails = document.getElementById('booking-details');
+                bookingDetails.innerHTML = `
+                    <div class="bg-[#1f2a37] p-4 rounded-lg">
+                        <p class="font-medium text-white">${selectedDoctor.name}</p>
+                        <p class="text-sm text-gray-400">${selectedDoctor.specialty} | ${selectedDoctor.location}</p>
+                        <p class="text-sm text-white mt-2">Date: ${selectedSlot.date}</p>
+                        <p class="text-sm text-white">Time: ${selectedSlot.time}</p>
+                    </div>
+                `;
+                
+                document.getElementById('booking-modal').classList.remove('hidden');
+            }
+
+            function confirmBooking() {
+                if (!selectedDoctor || !selectedSlot) return;
+                
+                const notes = document.getElementById('patient-notes').value;
+                
+                // Create new appointment
+                const newAppointment = {
+                    id: Date.now().toString(),
+                    patientId: currentUser.id,
+                    patientName: currentUser.name,
+                    doctor: selectedDoctor.name,
+                    doctorId: selectedDoctor.id,
+                    specialty: selectedDoctor.specialty,
+                    type: "Consultation",
+                    status: "confirmed",
+                    date: selectedSlot.date,
+                    time: selectedSlot.time,
+                    location: selectedDoctor.location,
+                    notes: notes,
+                    createdAt: new Date().toISOString()
+                };
+                
+                // Add to appointments
+                appointments.push(newAppointment);
+                localStorage.setItem('appointments', JSON.stringify(appointments));
+                
+                // Show success message
+                alert(`Appointment booked with ${selectedDoctor.name} on ${selectedSlot.date} at ${selectedSlot.time}`);
+                
+                // Close modal and reset
+                document.getElementById('booking-modal').classList.add('hidden');
+                document.getElementById('patient-notes').value = '';
+                selectedDoctor = null;
+                selectedSlot = null;
+                
+                // Refresh appointments list
+                if (currentPortal === 'patient') {
+                    loadPatientAppointments();
+                }
+            }
+
+            function loadPatientAppointments() {
+                const appointmentsContainer = document.getElementById('appointments-list');
+                if (!appointmentsContainer) return;
+                
+                const userAppointments = appointments.filter(apt => apt.patientId === currentUser.id);
+                
+                appointmentsContainer.innerHTML = '';
+                
+                if (userAppointments.length === 0) {
+                    appointmentsContainer.innerHTML = '<p class="text-gray-400 text-center py-8">No appointments found. Book your first appointment!</p>';
+                    return;
+                }
+                
+                userAppointments.forEach(appointment => {
+                    const appointmentCard = document.createElement('div');
+                    appointmentCard.className = 'kpi-card p-6 border-l-4 border-blue-500';
+                    
+                    let statusClass = 'status-confirmed';
+                    let statusText = 'Confirmed';
+                    
+                    if (appointment.status === 'pending') {
+                        statusClass = 'status-pending';
+                        statusText = 'Pending';
+                    } else if (appointment.status === 'cancelled') {
+                        statusClass = 'status-cancelled';
+                        statusText = 'Cancelled';
+                    }
+                    
+                    appointmentCard.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-400">Upcoming Visit</p>
+                                <h2 class="text-xl font-semibold text-white">${appointment.doctor} (${appointment.type})</h2>
+                            </div>
+                            <span class="text-sm px-3 py-1 rounded-full ${statusClass} font-medium">${statusText}</span>
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p class="text-gray-500">Date & Time</p>
+                                <p class="font-medium text-white">${appointment.date} at ${appointment.time}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Location</p>
+                                <p class="font-medium text-white">${appointment.location}</p>
+                            </div>
+                        </div>
+                        ${appointment.notes ? `<div class="mt-4"><p class="text-gray-500 text-sm">Notes:</p><p class="text-white">${appointment.notes}</p></div>` : ''}
+                        <div class="mt-6 space-x-4">
+                            ${appointment.status !== 'cancelled' ? `
+                                <button class="reschedule-btn px-4 py-2 text-sm rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white font-medium" data-id="${appointment.id}">Reschedule</button>
+                                <button class="cancel-btn px-4 py-2 text-sm rounded-lg border border-red-500 text-red-400 hover:bg-red-900/30" data-id="${appointment.id}">Cancel</button>
+                            ` : ''}
+                            <button class="directions-btn px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-medium">Directions</button>
+                        </div>
+                    `;
+                    
+                    appointmentsContainer.appendChild(appointmentCard);
+                });
+
+                // Add event listeners to action buttons
+                document.querySelectorAll('.reschedule-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const appointmentId = e.target.getAttribute('data-id');
+                        openRescheduleModal(appointmentId);
+                    });
+                });
+
+                document.querySelectorAll('.cancel-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const appointmentId = e.target.getAttribute('data-id');
+                        cancelAppointment(appointmentId);
+                    });
+                });
+            }
+
+            function openRescheduleModal(appointmentId) {
+                appointmentToReschedule = appointments.find(apt => apt.id === appointmentId);
+                if (!appointmentToReschedule) return;
+
+                const doctor = mockData.doctors.find(d => d.id === appointmentToReschedule.doctorId);
+                if (!doctor) return;
+
+                // Show current appointment details
+                const rescheduleDetails = document.getElementById('reschedule-details');
+                rescheduleDetails.innerHTML = `
+                    <div class="bg-[#1f2a37] p-4 rounded-lg">
+                        <p class="font-medium text-white">Current Appointment</p>
+                        <p class="text-sm text-gray-400">${appointmentToReschedule.doctor} | ${appointmentToReschedule.specialty}</p>
+                        <p class="text-sm text-white mt-2">Date: ${appointmentToReschedule.date}</p>
+                        <p class="text-sm text-white">Time: ${appointmentToReschedule.time}</p>
+                    </div>
+                `;
+
+                // Show available time slots for rescheduling
+                const rescheduleSlots = document.getElementById('reschedule-slots');
+                rescheduleSlots.innerHTML = '';
+
+                doctor.availableSlots.forEach(slot => {
+                    if (!slot.booked) {
+                        const slotElement = document.createElement('div');
+                        slotElement.className = 'time-slot available p-3 text-center cursor-pointer';
+                        slotElement.setAttribute('data-time', slot.time);
+                        slotElement.setAttribute('data-date', slot.date);
+                        slotElement.textContent = `${slot.date} - ${slot.time}`;
+                        
+                        slotElement.addEventListener('click', function() {
+                            document.querySelectorAll('#reschedule-slots .time-slot').forEach(s => {
+                                s.classList.remove('selected');
+                            });
+                            this.classList.add('selected');
+                        });
+                        
+                        rescheduleSlots.appendChild(slotElement);
+                    }
+                });
+
+                document.getElementById('reschedule-modal').classList.remove('hidden');
+            }
+
+            function confirmReschedule() {
+                if (!appointmentToReschedule) return;
+
+                const selectedSlotElement = document.querySelector('#reschedule-slots .time-slot.selected');
+                if (!selectedSlotElement) {
+                    alert('Please select a new time slot');
+                    return;
+                }
+
+                const newDate = selectedSlotElement.getAttribute('data-date');
+                const newTime = selectedSlotElement.getAttribute('data-time');
+
+                // Update appointment
+                appointmentToReschedule.date = newDate;
+                appointmentToReschedule.time = newTime;
+                appointmentToReschedule.status = 'confirmed';
+
+                // Save to localStorage
+                localStorage.setItem('appointments', JSON.stringify(appointments));
+
+                // Show success message
+                alert(`Appointment rescheduled to ${newDate} at ${newTime}`);
+
+                // Close modal
+                document.getElementById('reschedule-modal').classList.add('hidden');
+                appointmentToReschedule = null;
+
+                // Refresh appointments list
+                loadPatientAppointments();
+            }
+
+            function cancelAppointment(appointmentId) {
+                if (confirm('Are you sure you want to cancel this appointment?')) {
+                    const appointmentIndex = appointments.findIndex(apt => apt.id === appointmentId);
+                    if (appointmentIndex !== -1) {
+                        appointments[appointmentIndex].status = 'cancelled';
+                        localStorage.setItem('appointments', JSON.stringify(appointments));
+                        
+                        alert('Appointment cancelled successfully');
+                        loadPatientAppointments();
+                    }
+                }
+            }
+
+            function loadAdminAppointments() {
+                const appointmentsContainer = document.getElementById('admin-appointments-list');
+                if (!appointmentsContainer) return;
+
+                // Calculate statistics
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                const todayAppointments = appointments.filter(apt => apt.date.includes('Today') || apt.date === today);
+                const confirmedAppointments = appointments.filter(apt => apt.status === 'confirmed');
+                const pendingAppointments = appointments.filter(apt => apt.status === 'pending');
+                const cancelledAppointments = appointments.filter(apt => apt.status === 'cancelled');
+
+                // Update statistics
+                document.getElementById('today-appointments').textContent = todayAppointments.length;
+                document.getElementById('confirmed-appointments').textContent = confirmedAppointments.length;
+                document.getElementById('pending-appointments').textContent = pendingAppointments.length;
+                document.getElementById('cancelled-appointments').textContent = cancelledAppointments.length;
+
+                appointmentsContainer.innerHTML = '';
+
+                if (appointments.length === 0) {
+                    appointmentsContainer.innerHTML = '<p class="text-gray-400 text-center py-8">No appointments found in the system.</p>';
+                    return;
+                }
+
+                appointments.forEach(appointment => {
+                    const appointmentCard = document.createElement('div');
+                    appointmentCard.className = 'kpi-card p-4 border-l-4 border-blue-500';
+                    
+                    let statusClass = 'status-confirmed';
+                    let statusText = 'Confirmed';
+                    
+                    if (appointment.status === 'pending') {
+                        statusClass = 'status-pending';
+                        statusText = 'Pending';
+                    } else if (appointment.status === 'cancelled') {
+                        statusClass = 'status-cancelled';
+                        statusText = 'Cancelled';
+                    }
+                    
+                    appointmentCard.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h3 class="text-lg font-semibold text-white">${appointment.patientName}</h3>
+                                <p class="text-sm text-gray-400">Appointment with ${appointment.doctor}</p>
+                            </div>
+                            <span class="text-sm px-3 py-1 rounded-full ${statusClass} font-medium">${statusText}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p class="text-gray-500">Date & Time</p>
+                                <p class="font-medium text-white">${appointment.date} at ${appointment.time}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Location</p>
+                                <p class="font-medium text-white">${appointment.location}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Specialty</p>
+                                <p class="font-medium text-white">${appointment.specialty}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Type</p>
+                                <p class="font-medium text-white">${appointment.type}</p>
+                            </div>
+                        </div>
+                        ${appointment.notes ? `<div class="mt-3"><p class="text-gray-500 text-sm">Patient Notes:</p><p class="text-white text-sm">${appointment.notes}</p></div>` : ''}
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-xs text-gray-500">Created: ${new Date(appointment.createdAt).toLocaleDateString()}</span>
+                            <div class="space-x-2">
+                                <button class="px-3 py-1 text-xs rounded-lg bg-blue-600 text-white">View Details</button>
+                                ${appointment.status !== 'cancelled' ? `
+                                    <button class="px-3 py-1 text-xs rounded-lg border border-yellow-500 text-yellow-400">Contact Patient</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                    
+                    appointmentsContainer.appendChild(appointmentCard);
+                });
+
+                // Add filter functionality
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const filter = this.getAttribute('data-filter');
+                        
+                        // Update button states
+                        document.querySelectorAll('.filter-btn').forEach(b => {
+                            b.classList.remove('bg-blue-600');
+                            b.classList.add('bg-gray-700');
+                        });
+                        this.classList.remove('bg-gray-700');
+                        this.classList.add('bg-blue-600');
+                        
+                        // Apply filter (simplified for prototype)
+                        alert(`Filtering by: ${filter}. In a real application, this would filter the appointments list.`);
+                    });
+                });
+            }
+
+            function loadNotifications() {
+                const notificationsContainer = document.getElementById('notifications-list');
+                if (!notificationsContainer) return;
+                
+                notificationsContainer.innerHTML = '';
+                
+                const userNotifications = [
+                    {
+                        id: 1,
+                        type: "reminder",
+                        title: "Appointment Reminder: 48 Hours",
+                        message: "Your appointment with Dr. Mofokeng is on Wednesday at 1:30 PM. Please bring your clinic card.",
+                        time: "2 hours ago",
+                        color: "green"
+                    },
+                    {
+                        id: 2,
+                        type: "system",
+                        title: "Welcome to HABS System",
+                        message: "Thank you for using our booking system. You can now book, reschedule, and manage your appointments easily.",
+                        time: "1 day ago",
+                        color: "blue"
+                    }
+                ];
+                
+                userNotifications.forEach(notification => {
+                    const notificationCard = document.createElement('div');
+                    notificationCard.className = `kpi-card p-4 border-l-4 border-${notification.color}-500 flex justify-between items-center`;
+                    
+                    notificationCard.innerHTML = `
+                        <div>
+                            <p class="font-medium text-white">${notification.title}</p>
+                            <p class="text-sm text-gray-400">${notification.message}</p>
+                        </div>
+                        <span class="text-xs text-gray-500">${notification.time}</span>
+                    `;
+                    
+                    notificationsContainer.appendChild(notificationCard);
+                });
+            }
+
+            function loadDashboard() {
+                // This would load dashboard data
+                console.log('Loading dashboard data');
+            }
+        });
+    </script>
+</body>
+</html>
